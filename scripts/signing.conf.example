@@ -1,0 +1,7 @@
+# Copy to signing.conf for stable local builds. Never commit the real file.
+# Select your own certificate explicitly; do not export its private key.
+SNAPNOTE_SIGNING_IDENTITY='YOUR_CERTIFICATE_SHA1'
+SNAPNOTE_SIGNING_TEAM='YOUR_TEAM_ID'
+SNAPNOTE_BUNDLE_ID='local.snapnote.app'
+# Also create an ignored signing.requirement using the designated requirement
+# from an app signed by this identity: codesign -d -r- /path/to/your/app

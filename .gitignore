@@ -1,0 +1,25 @@
+# Build products and local verification captures
+.build/
+build/
+dist/
+artifacts/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+
+# Private signing configuration and credentials
+scripts/signing.conf
+scripts/signing.requirement
+.local/
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.key
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
