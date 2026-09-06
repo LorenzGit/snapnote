@@ -11,7 +11,6 @@ struct Editor: View {
     @State private var noteExpanded = false
     @State private var feedback: String?
     @FocusState private var noteFocused: Bool
-    @FocusState private var customArrowLabelFocused: Bool
     private let palette: [(String, NSColor)] = [
         ("Red", .systemRed), ("Orange", .systemOrange), ("Green", .systemGreen),
         ("Blue", .systemBlue), ("Purple", .systemPurple), ("Black", .black), ("White", .white)
@@ -58,6 +57,11 @@ struct Editor: View {
                     iconButton(tool.rawValue, symbol: tool.symbol, hint: "\(tool.rawValue) · \(tool.key) — \(tool.hint)", selected: document.tool == tool) {
                         app.finishText(); noteFocused = false
                         document.tool = tool; document.selected = nil
+                    }
+                    if tool == .text && (document.tool == .text || document.selectedMark?.tool == .text || document.editingText != nil) {
+                        iconButton("Text background", symbol: "a.square.fill", hint: "Toggle black text background · ⌘⇧B", selected: document.activeTextBackground) {
+                            document.setTextBackground(!document.activeTextBackground)
+                        }.focusable(false)
                     }
                     if tool == .guide && (document.tool == .guide || document.selectedGuide != nil) { guideOptions }
                     if tool == .arrow && (document.tool == .arrow || document.selectedArrow != nil) {
@@ -215,11 +219,10 @@ struct Editor: View {
             Divider()
             VStack(alignment: .leading, spacing: 7) {
                 Text("Custom label").font(.system(size: 12, weight: .semibold))
-                TextField("Type your own phrase…", text: $customArrowLabel)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Custom arrow label").help("Type your own arrow label · Return: apply")
-                    .focused($customArrowLabelFocused)
-                    .onSubmit { applyCustomArrowLabel() }
+                ArrowLabelField(text: $customArrowLabel, onSubmit: applyCustomArrowLabel)
+                    .frame(height: min(100, max(24, CGFloat(customArrowLabel.components(separatedBy: "\n").count) * 17 + 8)))
+                Text("Shift+Return: new line · Return: apply")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button("Apply") { applyCustomArrowLabel() }
@@ -237,6 +240,9 @@ struct Editor: View {
                     }
                 }.fixedSize().accessibilityLabel("Arrow label size").help("Change arrow label text size")
             }
+            Toggle("Black background", isOn: Binding(get: { document.activeArrowTextBackground }, set: { document.setArrowTextBackground($0) }))
+                .toggleStyle(.switch).controlSize(.small)
+                .help("Black background behind the arrow label · ⌘⇧B")
             Text("Drag square handles to resize the arrow. Drag the round handle to curve it.")
                 .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.padding(16).frame(width: 230)
@@ -244,7 +250,7 @@ struct Editor: View {
                 let current = document.selectedArrow?.text ?? document.arrowLabel
                 customArrowLabel = Document.arrowPresets.contains(current) ? "" : current
             }
-            .task { customArrowLabelFocused = true }
+
     }
 
     private func applyCustomArrowLabel() {

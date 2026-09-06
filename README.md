@@ -9,15 +9,17 @@ Capture a region of your screen, mark it up, and copy it with a note. A small na
 Download the universal Mac app from [Releases](https://github.com/LorenzGit/snapnote/releases/latest). Requires **macOS 14 or later**, on Apple Silicon or Intel.
 
 1. Unzip the download and move `SnapNote.app` to Applications.
-2. Open SnapNote. This initial release is **not notarized**. If macOS blocks it, open **System Settings → Privacy & Security → Open Anyway** after attempting to launch it. See [Apple's instructions](https://support.apple.com/en-us/102445). Managed Macs may not allow this exception.
+2. Open SnapNote. This release is **not notarized**. If macOS blocks it, open **System Settings → Privacy & Security → Open Anyway** after attempting to launch it. See [Apple's instructions](https://support.apple.com/en-us/102445). Managed Macs may not allow this exception.
 3. Press **⌘⇧2**, grant Screen Recording permission when prompted, and select a region. macOS may request an app restart after permission changes.
 
 No account, network access, uploads, or analytics. Images stay on your Mac.
 
 ## Annotate
 
-- Arrows with draggable endpoints, a curve handle, preset phrases, and custom labels.
+- Arrows with draggable endpoints, a curve handle, preset phrases, and custom multiline labels. Labels follow the tail direction, stay inside the image, and move smoothly while you drag.
+- In the custom arrow label field, Shift+Return adds a line and Return applies the label.
 - Freehand drawing, rectangles, ellipses, and colored multiline text.
+- Optional black backgrounds for arrow labels and regular text. Use the arrow-label dropdown or the contextual Text background toolbar button. Each annotation keeps its setting; transparent is the default.
 - Full-image dotted guides with optional percentage labels. Vertical guides measure left to right; horizontal guides measure top to bottom. Labels stay inside the image.
 - Shift-drag for circles and squares. Select marks to move them or change their color and size.
 - A footer note that grows from one to five lines, then scrolls. Export adds it below the original image without side padding.
@@ -31,6 +33,7 @@ No account, network access, uploads, or analytics. Images stay on your Mac.
 | G | Place or drag a dotted guide |
 | Shift+G | Switch guide direction, preserving its percentage |
 | ⌘⇧P | Show/hide the selected guide percentage, or set it for new guides |
+| ⌘⇧B | Toggle a black background for arrow labels or regular text, including while typing |
 | Shift+Enter | Add a line while typing an annotation |
 | Enter or click outside | Finish annotation text and return to Move |
 | Escape | Cancel text or deselect a mark |
@@ -68,7 +71,7 @@ For stable local signing, configure the ignored files described in `scripts/sign
 - One image at a time. Opening or capturing another replaces the current edit.
 - Edits survive closing the window, but not quitting. Saved PNGs flatten annotations and the footer; there are no editable project files yet.
 - The capture shortcut is fixed. No history, crop, blur, or automatic updates.
-- The initial public build requires a Gatekeeper exception. Future notarized releases require a Developer ID certificate and Apple's notarization service.
+- The public build requires a Gatekeeper exception. Future notarized releases require a Developer ID certificate and Apple's notarization service.
 
 ## Contributing and license
 

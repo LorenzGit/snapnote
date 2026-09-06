@@ -19,13 +19,19 @@ enum Renderer {
             for p in mark.points.dropFirst() { path.line(to: p) }
             path.stroke()
         case .arrow:
-            guard let arrow = ArrowGeometry(mark) else { return }
+            guard let arrow = ArrowGeometry(mark, imageSize: imageSize) else { return }
             arrow.shaft.stroke()
             arrow.head.fill()
             if !mark.text.isEmpty {
-                (mark.text as NSString).draw(at: arrow.labelRect.origin, withAttributes: [
+                if mark.textBackground { drawTextBackground(in: arrow.labelBounds) }
+                NSGraphicsContext.saveGraphicsState()
+                let context = NSGraphicsContext.current?.cgContext
+                context?.translateBy(x: arrow.labelRect.minX, y: arrow.labelRect.minY)
+                context?.scaleBy(x: arrow.labelScale, y: arrow.labelScale)
+                (mark.text as NSString).draw(at: .zero, withAttributes: [
                     .font: arrow.labelFont, .foregroundColor: mark.color
                 ])
+                NSGraphicsContext.restoreGraphicsState()
             }
         case .rectangle, .ellipse:
             guard let end = mark.points.last else { return }
@@ -33,6 +39,7 @@ enum Renderer {
             let outline = mark.tool == .ellipse ? NSBezierPath(ovalIn: rect) : NSBezierPath(rect: rect)
             outline.withWidth(mark.width).stroke()
         case .text:
+            if mark.textBackground && !mark.text.isEmpty { drawTextBackground(in: mark.bounds) }
             (mark.text as NSString).draw(at: CGPoint(x: start.x + 6, y: start.y + 4), withAttributes: [
                 .font: NSFont.systemFont(ofSize: mark.fontSize, weight: .semibold), .foregroundColor: mark.color
             ])
@@ -50,6 +57,11 @@ enum Renderer {
             }
         case .select: break
         }
+    }
+
+    private static func drawTextBackground(in rect: CGRect) {
+        NSColor.black.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3).fill()
     }
 
     static func footerInset(width: CGFloat) -> CGFloat { min(20, width * 0.05) }

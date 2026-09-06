@@ -10,8 +10,11 @@ struct ArrowGeometry {
     let shaftWidth: CGFloat
     let labelRect: CGRect
     let labelFont: NSFont
+    let labelBounds: CGRect
+    let labelScale: CGFloat
+    let labelAngle: CGFloat
 
-    init?(_ mark: Mark) {
+    init?(_ mark: Mark, imageSize: CGSize? = nil) {
         guard mark.tool == .arrow, let start = mark.points.first, let end = mark.points.last else { return nil }
         let dx = end.x-start.x, dy = end.y-start.y, length = hypot(dx, dy)
         guard length > 2 else { return nil }
@@ -48,8 +51,55 @@ struct ArrowGeometry {
         head.line(to: CGPoint(x: end.x-headLength*cos(angle+0.48), y: end.y-headLength*sin(angle+0.48)))
         head.close()
         labelFont = .systemFont(ofSize: mark.fontSize, weight: .semibold)
+        if mark.text.isEmpty { labelRect = .null; labelBounds = .null; labelScale = 1; labelAngle = 0; return }
         let size = (mark.text as NSString).size(withAttributes: [.font: labelFont])
-        labelRect = mark.text.isEmpty ? .null : CGRect(x: start.x-size.width/2, y: start.y-size.height-10, width: size.width, height: size.height)
+        let padding = mark.textBackground ? CGSize(width: 12, height: 8) : .zero
+        let natural = CGSize(width: size.width + padding.width, height: size.height + padding.height)
+        let scale = imageSize.map { min(1, $0.width / max(1, natural.width + 8), $0.height / max(1, natural.height + 8)) } ?? 1
+        labelScale = scale
+        let box = CGSize(width: natural.width * scale, height: natural.height * scale)
+        if let offset = mark.arrowLabelOffset {
+            labelAngle = 0
+            var origin = CGPoint(x: start.x+offset.x, y: start.y+offset.y)
+            if let imageSize {
+                let margin = 4 * scale
+                origin.x = min(max(margin, origin.x), imageSize.width-box.width-margin)
+                origin.y = min(max(margin, origin.y), imageSize.height-box.height-margin)
+            }
+            labelBounds = CGRect(origin: origin, size: box)
+            labelRect = labelBounds.insetBy(dx: padding.width*scale/2, dy: padding.height*scale/2)
+            return
+        }
+        // Follow the tail tangent, including on curved arrows. Try nearby sides if
+        // the image edge would push the label back onto the shaft.
+        let tailAngle = atan2(start.y-control.y, start.x-control.x)
+        let gap = max(10, shaftWidth / 2 + 6)
+        var best = CGRect.zero
+        var bestScore = CGFloat.greatestFiniteMagnitude
+        var bestAngle: CGFloat = 0
+        for i in 0..<(mark.arrowLabelAngle == nil ? 16 : 1) {
+            let offset = mark.arrowLabelAngle ?? (CGFloat((i + 1) / 2) * .pi / 8 * (i.isMultiple(of: 2) ? 1 : -1))
+            let vx = cos(tailAngle + offset), vy = sin(tailAngle + offset)
+            let distance = min(box.width / 2 / max(0.0001, abs(vx)), box.height / 2 / max(0.0001, abs(vy))) + gap
+            var rect = CGRect(x: start.x + vx*distance - box.width/2,
+                              y: start.y + vy*distance - box.height/2, width: box.width, height: box.height)
+            let desired = rect.origin
+            if let imageSize {
+                let margin = 4 * scale
+                rect.origin.x = min(max(margin, rect.minX), imageSize.width-box.width-margin)
+                rect.origin.y = min(max(margin, rect.minY), imageSize.height-box.height-margin)
+            }
+            let clearance = rect.insetBy(dx: -shaftWidth/2-3, dy: -shaftWidth/2-3)
+            var collisions = 0
+            for j in 0...64 where clearance.contains(point(CGFloat(j)/64)) { collisions += 1 }
+            if rect.intersects(head.bounds) { collisions += 64 }
+            let score = CGFloat(collisions)*10000 + abs(offset)*10 + hypot(rect.minX-desired.x, rect.minY-desired.y)
+            if score < bestScore { bestScore = score; best = rect; bestAngle = offset }
+        }
+        labelAngle = bestAngle
+        labelBounds = mark.text.isEmpty ? .null : best
+        labelRect = mark.text.isEmpty ? .null : best.insetBy(dx: padding.width*scale/2, dy: padding.height*scale/2)
+
     }
 
     func point(at t: CGFloat) -> CGPoint {
@@ -58,10 +108,10 @@ struct ArrowGeometry {
     }
 
     var handle: CGPoint { point(at: 0.5) }
-    var bounds: CGRect { shaft.bounds.insetBy(dx: -shaftWidth/2, dy: -shaftWidth/2).union(head.bounds).union(labelRect) }
+    var bounds: CGRect { shaft.bounds.insetBy(dx: -shaftWidth/2, dy: -shaftWidth/2).union(head.bounds).union(labelBounds) }
 
     func contains(_ point: CGPoint) -> Bool {
-        if labelRect.contains(point) || head.contains(point) { return true }
+        if labelBounds.contains(point) || head.contains(point) { return true }
         let tolerance = max(8, shaftWidth/2+4)
         var previous = start
         for i in 1...64 {

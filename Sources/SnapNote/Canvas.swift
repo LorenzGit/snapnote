@@ -5,6 +5,7 @@ struct Canvas: NSViewRepresentable {
     @ObservedObject var document: Document
     func makeNSView(context: Context) -> AnnotationCanvas { AnnotationCanvas(document: document) }
     func updateNSView(_ view: AnnotationCanvas, context: Context) {
+        view.updateTextBackground()
         view.needsDisplay = true
         view.toolTip = document.selectedArrow != nil
             ? "Square handles: resize · Round handle: curve · Delete: remove · Escape: deselect"
@@ -21,7 +22,10 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
     var resizing: Mark?
     var endpointIndex: Int?
     var textField: NSTextField?
-    var editingMark: Mark?
+    var editingMark: Mark? {
+        get { document.editingText }
+        set { document.editingText = newValue }
+    }
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -65,10 +69,12 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         if let draft { Renderer.draw(draft, imageSize: image.size) }
         if let selected = document.marks.first(where: { $0.id == document.selected }), moving == nil, editingMark == nil {
             NSColor.controlAccentColor.setStroke()
-            let path = NSBezierPath(rect: (draft ?? selected).bounds.insetBy(dx: -3, dy: -3))
+            let mark = draft ?? selected
+            let selectionBounds = ArrowGeometry(mark, imageSize: image.size)?.bounds ?? mark.bounds
+            let path = NSBezierPath(rect: selectionBounds.insetBy(dx: -3, dy: -3))
             path.lineWidth = 1.5/zoom
             path.setLineDash([4/zoom, 3/zoom], count: 2, phase: 0); path.stroke()
-            if let arrow = ArrowGeometry(draft ?? selected) {
+            if let arrow = ArrowGeometry(draft ?? selected, imageSize: document.image?.size) {
                 for (point, endpoint) in [(arrow.start, true), (arrow.end, true), (arrow.handle, false)] {
                     let radius = (endpoint ? 5.0 : 6.0)/zoom
                     let rect = CGRect(x: point.x-radius, y: point.y-radius, width: radius*2, height: radius*2)
@@ -86,7 +92,7 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         window?.makeFirstResponder(self)
         guard document.image != nil, imageRect.contains(convert(event.locationInWindow, from: nil)) else { return }
         let p = imagePoint(event)
-        if let selected = document.selectedArrow, let arrow = ArrowGeometry(selected),
+        if let selected = document.selectedArrow, let arrow = ArrowGeometry(selected, imageSize: document.image?.size),
            document.tool == .select || document.tool == .arrow {
             for (index, point) in [(0, arrow.start), (selected.points.count-1, arrow.end)] {
                 if hypot(p.x-point.x, p.y-point.y) <= 10/zoom {
@@ -99,7 +105,7 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
                 needsDisplay = true; return
             }
         }
-        if document.tool == .arrow, let hit = document.marks.last(where: { ArrowGeometry($0)?.contains(p) == true }) {
+        if document.tool == .arrow, let hit = document.marks.last(where: { ArrowGeometry($0, imageSize: document.image?.size)?.contains(p) == true }) {
             document.selected = hit.id; moving = hit; draft = hit; dragOrigin = p
             needsDisplay = true; return
         }
@@ -111,13 +117,13 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         if document.tool == .select {
             let hit = document.marks.last { mark in
                 if let size = document.image?.size, let guide = GuideGeometry(mark, imageSize: size) { return guide.contains(p, tolerance: max(8/zoom, mark.width)) }
-                return ArrowGeometry(mark)?.contains(p) ?? mark.bounds.contains(p)
+                return ArrowGeometry(mark, imageSize: document.image?.size)?.contains(p) ?? mark.bounds.contains(p)
             }
             document.selected = hit?.id
             if event.clickCount == 2, let hit, hit.tool == .text { beginText(hit); return }
             moving = hit; draft = hit; dragOrigin = p
         } else if document.tool == .text {
-            beginText(Mark(tool: .text, points: [p], color: document.color, width: document.width, fontSize: document.fontSize))
+            beginText(Mark(tool: .text, points: [p], color: document.color, width: document.width, fontSize: document.fontSize, textBackground: document.textBackground))
         } else {
             document.selected = nil
             draft = Mark(tool: document.tool, points: [p], color: document.color, width: document.width)
@@ -127,17 +133,19 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             }
             if document.tool == .arrow {
                 draft?.text = document.arrowLabel; draft?.fontSize = document.arrowFontSize; draft?.bend = document.arrowBend
+                draft?.textBackground = document.arrowTextBackground
             }
         }
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
+        let previous = draft
         let p = imagePoint(event, clamp: true)
         if let resizing, let index = endpointIndex {
             let other = resizing.points[index == 0 ? resizing.points.count-1 : 0]
             if hypot(p.x-other.x, p.y-other.y) > 2 { draft?.points[index] = p }
-        } else if let bending, let arrow = ArrowGeometry(bending) {
+        } else if let bending, let arrow = ArrowGeometry(bending, imageSize: document.image?.size) {
             draft?.bend = arrow.bend(toward: p)
         } else if let moving, let origin = dragOrigin {
             draft = moving.translated(by: CGPoint(x: p.x-origin.x, y: p.y-origin.y))
@@ -156,11 +164,21 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             }
             draft?.points = [first, end]
         }
+        if var mark = draft, mark.tool == .arrow, let previous,
+           let tail = previous.points.first, let layout = ArrowGeometry(previous, imageSize: document.image?.size), !layout.labelBounds.isNull {
+            if moving != nil {
+                mark.arrowLabelOffset = previous.arrowLabelOffset ?? CGPoint(x: layout.labelBounds.minX-tail.x, y: layout.labelBounds.minY-tail.y)
+            } else {
+                mark.arrowLabelAngle = previous.arrowLabelAngle ?? layout.labelAngle
+            }
+            draft = mark
+        }
         needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard let mark = draft else { return }
+        guard var mark = draft else { return }
+        mark.arrowLabelOffset = nil; mark.arrowLabelAngle = nil
         if let resizing {
             if mark.points != resizing.points { document.commit(document.marks.map { $0.id == mark.id ? mark : $0 }) }
         } else if let bending {
@@ -198,8 +216,22 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         field.toolTip = "Type a label · Shift+Return: new line · Return: place · Escape: cancel"
         addSubview(field); textField = field
         resizeTextField()
+        updateTextBackground()
         window?.makeFirstResponder(field)
+        updateTextBackground()
         needsDisplay = true
+    }
+
+    func updateTextBackground() {
+        guard let field = textField, let mark = editingMark else { return }
+        field.backgroundColor = .black
+        field.drawsBackground = mark.textBackground
+        if let editor = field.currentEditor() as? NSTextView {
+            editor.backgroundColor = .black
+            editor.drawsBackground = mark.textBackground
+            editor.needsDisplay = true
+        }
+        field.needsDisplay = true
     }
 
     func controlTextDidChange(_ obj: Notification) { resizeTextField() }
@@ -240,6 +272,7 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             if document.marks.contains(where: { $0.id == mark.id }) {
                 document.commit(document.marks.map { $0.id == mark.id ? mark : $0 })
             } else { document.commit(document.marks + [mark]) }
+            document.selected = mark.id
         }
         needsDisplay = true
     }

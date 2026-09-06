@@ -50,6 +50,10 @@ struct Mark: Identifiable {
     var bend: CGFloat = 0
     var guideAxis: GuideAxis = .vertical
     var showsPercentage = true
+    var textBackground = false
+    // Drag-only placement choices: translate with the arrow, or follow its angle.
+    var arrowLabelOffset: CGPoint?
+    var arrowLabelAngle: CGFloat?
 
     var bounds: CGRect {
         guard let first = points.first else { return .zero }
@@ -83,6 +87,9 @@ final class Document: ObservableObject {
     @Published var arrowBend: CGFloat = 0
     @Published var guideAxis: GuideAxis = .vertical
     @Published var guidePercentage = true
+    @Published var textBackground = false
+    @Published var arrowTextBackground = false
+    @Published var editingText: Mark?
     static let arrowPresets = ["Move", "Too big", "Too small", "Center it", "Remove"]
     @Published var selected: UUID?
     @Published var status = "Ready when you are"
@@ -97,7 +104,7 @@ final class Document: ObservableObject {
         self.image = image
         let pixels = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         pixelScale = CGFloat(pixels?.width ?? Int(image.size.width)) / max(1, image.size.width)
-        marks = []; blurb = ""; selected = nil
+        marks = []; blurb = ""; selected = nil; editingText = nil
         undoStack = []; redoStack = []; syncHistory()
         status = "Captured · Add a little context"
     }
@@ -147,6 +154,24 @@ final class Document: ObservableObject {
     }
 
     var selectedArrow: Mark? { marks.first { $0.id == selected && $0.tool == .arrow } }
+
+    var activeTextBackground: Bool { editingText?.textBackground ?? (selectedMark?.tool == .text ? selectedMark?.textBackground : nil) ?? textBackground }
+    var activeArrowTextBackground: Bool { selectedArrow?.textBackground ?? arrowTextBackground }
+
+    func setTextBackground(_ enabled: Bool) {
+        textBackground = enabled
+        if editingText != nil { editingText?.textBackground = enabled; return }
+        guard var mark = selectedMark, mark.tool == .text, mark.textBackground != enabled else { return }
+        mark.textBackground = enabled
+        commit(marks.map { $0.id == mark.id ? mark : $0 })
+    }
+
+    func setArrowTextBackground(_ enabled: Bool) {
+        arrowTextBackground = enabled
+        guard var mark = selectedArrow, mark.textBackground != enabled else { return }
+        mark.textBackground = enabled
+        commit(marks.map { $0.id == mark.id ? mark : $0 })
+    }
 
     var selectedGuide: Mark? { marks.first { $0.id == selected && $0.tool == .guide } }
 

@@ -191,9 +191,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func handleKey(_ event: NSEvent) -> NSEvent? {
-        if arrowLabelPopoverOpen { return event }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        if flags.contains([.command, .shift]), key == "b" {
+            if document.editingText != nil || document.selectedMark?.tool == .text || document.tool == .text {
+                document.setTextBackground(!document.activeTextBackground); return nil
+            }
+            if document.selectedArrow != nil || document.tool == .arrow {
+                document.setArrowTextBackground(!document.activeArrowTextBackground); return nil
+            }
+        }
+        if arrowLabelPopoverOpen { return event }
         // Popovers have their own window and field editor.
         let responder = event.window?.firstResponder ?? NSApp.keyWindow?.firstResponder ?? window?.firstResponder
         let editing = responder is NSTextView || responder is NSTextField
