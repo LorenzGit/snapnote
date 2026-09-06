@@ -18,6 +18,7 @@ No account, network access, uploads, or analytics. Images stay on your Mac.
 
 - Arrows with draggable endpoints, a curve handle, preset phrases, and custom labels.
 - Freehand drawing, rectangles, ellipses, and colored multiline text.
+- Full-image dotted guides with optional percentage labels. Vertical guides measure left to right; horizontal guides measure top to bottom. Labels stay inside the image.
 - Shift-drag for circles and squares. Select marks to move them or change their color and size.
 - A footer note that grows from one to five lines, then scrolls. Export adds it below the original image without side padding.
 - Undo/redo, PNG saving, and clipboard copying at the image's original resolution.
@@ -27,6 +28,9 @@ No account, network access, uploads, or analytics. Images stay on your Mac.
 | --- | --- |
 | ⌘⇧2 | Capture a region from any app |
 | V / A / P / R / E / T | Move / arrow / draw / box / ellipse / text |
+| G | Place or drag a dotted guide |
+| Shift+G | Switch guide direction, preserving its percentage |
+| ⌘⇧P | Show/hide the selected guide percentage, or set it for new guides |
 | Shift+Enter | Add a line while typing an annotation |
 | Enter or click outside | Finish annotation text and return to Move |
 | Escape | Cancel text or deselect a mark |

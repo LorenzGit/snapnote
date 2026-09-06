@@ -210,6 +210,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             default: return event
             }
         }
+        if !editing, flags.intersection([.command, .control, .option]).isEmpty, flags.contains(.shift), key == "g" {
+            let axis = document.selectedGuide?.guideAxis ?? document.guideAxis
+            document.setGuideAxis(axis == .vertical ? .horizontal : .vertical)
+            if document.selectedGuide == nil { document.selected = nil }
+            document.tool = .guide; return nil
+        }
         if !editing, flags.intersection([.command, .control, .option]).isEmpty, key == "[" || key == "]" {
             document.adjustSize(increase: key == "]"); return nil
         }

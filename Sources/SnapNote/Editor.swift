@@ -59,6 +59,7 @@ struct Editor: View {
                         app.finishText(); noteFocused = false
                         document.tool = tool; document.selected = nil
                     }
+                    if tool == .guide && (document.tool == .guide || document.selectedGuide != nil) { guideOptions }
                     if tool == .arrow && (document.tool == .arrow || document.selectedArrow != nil) {
                         arrowLabelMenu
                     }
@@ -110,6 +111,24 @@ struct Editor: View {
                 .keyboardShortcut("c", modifiers: [.command, .shift]).padding(.leading, 5)
         }
         .padding(.leading, 78).padding(.trailing, 10).frame(height: 46)
+    }
+
+    private var guideOptions: some View {
+        let axis = document.selectedGuide?.guideAxis ?? document.guideAxis
+        let percent = document.selectedGuide?.showsPercentage ?? document.guidePercentage
+        return HStack(spacing: 0) {
+            Menu {
+                ForEach(GuideAxis.allCases, id: \.self) { value in
+                    Button(value.rawValue) { document.setGuideAxis(value) }
+                        .help(value == .vertical ? "Vertical guide · 0% left, 100% right" : "Horizontal guide · 0% top, 100% bottom")
+                }
+            } label: { Text(axis == .vertical ? "V" : "H").font(.system(size: 11, weight: .medium)) }
+                .menuStyle(.borderlessButton).fixedSize().frame(width: 32)
+                .accessibilityLabel("Guide direction: \(axis.rawValue)").help("Guide direction · Shift+G")
+            iconButton("Guide percentage", symbol: "percent", hint: "Show or hide guide percentage · ⌘⇧P", selected: percent) {
+                document.setGuidePercentage(!percent)
+            }.keyboardShortcut("p", modifiers: [.command, .shift])
+        }
     }
 
     private var arrowLabelMenu: some View {

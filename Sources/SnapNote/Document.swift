@@ -2,7 +2,7 @@ import AppKit
 import Combine
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select = "Move", arrow = "Arrow", pen = "Draw", rectangle = "Box", ellipse = "Ellipse", text = "Text"
+    case select = "Move", arrow = "Arrow", pen = "Draw", rectangle = "Box", ellipse = "Ellipse", guide = "Guide", text = "Text"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -11,6 +11,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: return "pencil.tip"
         case .rectangle: return "rectangle"
         case .ellipse: return "oval"
+        case .guide: return "line.diagonal"
         case .text: return "textformat"
         }
     }
@@ -21,6 +22,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: return "P"
         case .rectangle: return "R"
         case .ellipse: return "E"
+        case .guide: return "G"
         case .text: return "T"
         }
     }
@@ -31,6 +33,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: return "Draw freely on the image"
         case .rectangle: return "Drag a box · Hold Shift for a square"
         case .ellipse: return "Drag an ellipse · Hold Shift for a circle"
+        case .guide: return "Click or drag a dotted guide · Shift+G: change direction"
         case .text: return "Click to type · Shift+Return: new line · Return to place · Escape to cancel"
         }
     }
@@ -45,6 +48,8 @@ struct Mark: Identifiable {
     var text = ""
     var fontSize: CGFloat = 24
     var bend: CGFloat = 0
+    var guideAxis: GuideAxis = .vertical
+    var showsPercentage = true
 
     var bounds: CGRect {
         guard let first = points.first else { return .zero }
@@ -76,6 +81,8 @@ final class Document: ObservableObject {
     @Published var arrowLabel = ""
     @Published var arrowFontSize: CGFloat = 16
     @Published var arrowBend: CGFloat = 0
+    @Published var guideAxis: GuideAxis = .vertical
+    @Published var guidePercentage = true
     static let arrowPresets = ["Move", "Too big", "Too small", "Center it", "Remove"]
     @Published var selected: UUID?
     @Published var status = "Ready when you are"
@@ -140,6 +147,25 @@ final class Document: ObservableObject {
     }
 
     var selectedArrow: Mark? { marks.first { $0.id == selected && $0.tool == .arrow } }
+
+    var selectedGuide: Mark? { marks.first { $0.id == selected && $0.tool == .guide } }
+
+    func setGuideAxis(_ axis: GuideAxis) {
+        guideAxis = axis
+        guard var mark = selectedGuide, let size = image?.size,
+              let old = GuideGeometry(mark, imageSize: size), mark.guideAxis != axis else { return }
+        let fraction = old.percentage / 100
+        mark.guideAxis = axis
+        mark = GuideGeometry.positioned(mark, at: CGPoint(x: size.width * fraction, y: size.height * fraction), imageSize: size)
+        commit(marks.map { $0.id == mark.id ? mark : $0 })
+    }
+
+    func setGuidePercentage(_ visible: Bool) {
+        guidePercentage = visible
+        guard var mark = selectedGuide, mark.showsPercentage != visible else { return }
+        mark.showsPercentage = visible
+        commit(marks.map { $0.id == mark.id ? mark : $0 })
+    }
 
     func setStrokeWidth(_ width: CGFloat) {
         self.width = width

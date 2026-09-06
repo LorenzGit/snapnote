@@ -2,7 +2,7 @@ import AppKit
 
 /// Both the editor and PNG export draw in image points, with a top-left origin.
 enum Renderer {
-    static func draw(_ mark: Mark) {
+    static func draw(_ mark: Mark, imageSize: CGSize? = nil) {
         guard let start = mark.points.first else { return }
         mark.color.setStroke()
         mark.color.setFill()
@@ -36,6 +36,18 @@ enum Renderer {
             (mark.text as NSString).draw(at: CGPoint(x: start.x + 6, y: start.y + 4), withAttributes: [
                 .font: NSFont.systemFont(ofSize: mark.fontSize, weight: .semibold), .foregroundColor: mark.color
             ])
+        case .guide:
+            guard let imageSize, let guide = GuideGeometry(mark, imageSize: imageSize) else { return }
+            path.move(to: guide.start); path.line(to: guide.end)
+            path.setLineDash([0.01, max(4, mark.width * 2.5)], count: 2, phase: 0)
+            path.stroke()
+            if mark.showsPercentage, let context = NSGraphicsContext.current?.cgContext {
+                context.saveGState()
+                context.translateBy(x: guide.labelRect.minX, y: guide.labelRect.minY)
+                context.scaleBy(x: guide.labelScale, y: guide.labelScale)
+                (guide.label as NSString).draw(at: .zero, withAttributes: [.font: guide.labelFont, .foregroundColor: mark.color])
+                context.restoreGState()
+            }
         case .select: break
         }
     }
@@ -76,7 +88,7 @@ enum Renderer {
         cg.saveGState()
         cg.clip(to: CGRect(origin: .zero, size: image.size))
         image.draw(in: CGRect(origin: .zero, size: image.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
-        marks.forEach(draw)
+        marks.forEach { draw($0, imageSize: image.size) }
         cg.restoreGState()
         if footer > 0 {
             NSColor(calibratedWhite: 0.97, alpha: 1).setFill()

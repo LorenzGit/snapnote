@@ -61,8 +61,8 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         cg.translateBy(x: rect.minX, y: rect.minY); cg.scaleBy(x: zoom, y: zoom)
         cg.clip(to: CGRect(origin: .zero, size: image.size))
         image.draw(in: CGRect(origin: .zero, size: image.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-        for mark in document.marks where mark.id != moving?.id && mark.id != bending?.id && mark.id != resizing?.id && mark.id != editingMark?.id { Renderer.draw(mark) }
-        if let draft { Renderer.draw(draft) }
+        for mark in document.marks where mark.id != moving?.id && mark.id != bending?.id && mark.id != resizing?.id && mark.id != editingMark?.id { Renderer.draw(mark, imageSize: image.size) }
+        if let draft { Renderer.draw(draft, imageSize: image.size) }
         if let selected = document.marks.first(where: { $0.id == document.selected }), moving == nil, editingMark == nil {
             NSColor.controlAccentColor.setStroke()
             let path = NSBezierPath(rect: (draft ?? selected).bounds.insetBy(dx: -3, dy: -3))
@@ -103,8 +103,16 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             document.selected = hit.id; moving = hit; draft = hit; dragOrigin = p
             needsDisplay = true; return
         }
+        if document.tool == .guide, let size = document.image?.size,
+           let hit = document.marks.last(where: { GuideGeometry($0, imageSize: size)?.contains(p, tolerance: max(8/zoom, $0.width)) == true }) {
+            document.selected = hit.id; moving = hit; draft = hit; dragOrigin = p
+            needsDisplay = true; return
+        }
         if document.tool == .select {
-            let hit = document.marks.last { mark in ArrowGeometry(mark)?.contains(p) ?? mark.bounds.contains(p) }
+            let hit = document.marks.last { mark in
+                if let size = document.image?.size, let guide = GuideGeometry(mark, imageSize: size) { return guide.contains(p, tolerance: max(8/zoom, mark.width)) }
+                return ArrowGeometry(mark)?.contains(p) ?? mark.bounds.contains(p)
+            }
             document.selected = hit?.id
             if event.clickCount == 2, let hit, hit.tool == .text { beginText(hit); return }
             moving = hit; draft = hit; dragOrigin = p
@@ -113,6 +121,10 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
         } else {
             document.selected = nil
             draft = Mark(tool: document.tool, points: [p], color: document.color, width: document.width)
+            if document.tool == .guide, var mark = draft, let size = document.image?.size {
+                mark.guideAxis = document.guideAxis; mark.showsPercentage = document.guidePercentage
+                draft = GuideGeometry.positioned(mark, at: p, imageSize: size)
+            }
             if document.tool == .arrow {
                 draft?.text = document.arrowLabel; draft?.fontSize = document.arrowFontSize; draft?.bend = document.arrowBend
             }
@@ -129,6 +141,11 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             draft?.bend = arrow.bend(toward: p)
         } else if let moving, let origin = dragOrigin {
             draft = moving.translated(by: CGPoint(x: p.x-origin.x, y: p.y-origin.y))
+            if moving.tool == .guide, let mark = draft, let point = mark.points.first, let size = document.image?.size {
+                draft = GuideGeometry.positioned(mark, at: point, imageSize: size)
+            }
+        } else if let mark = draft, mark.tool == .guide, let size = document.image?.size {
+            draft = GuideGeometry.positioned(mark, at: p, imageSize: size)
         } else if draft?.tool == .pen { draft?.points.append(p) }
         else if let first = draft?.points.first {
             var end = p
@@ -150,13 +167,13 @@ final class AnnotationCanvas: NSView, NSTextFieldDelegate {
             if mark.bend != bending.bend { document.commit(document.marks.map { $0.id == mark.id ? mark : $0 }) }
         } else if let moving, let origin = dragOrigin {
             let p = imagePoint(event, clamp: true)
-            if hypot(p.x-origin.x, p.y-origin.y) > 0.5 {
+            if hypot(p.x-origin.x, p.y-origin.y) > 0.5 && (moving.tool != .guide || mark.points != moving.points) {
                 document.commit(document.marks.map { $0.id == moving.id ? mark : $0 })
             }
-        } else if mark.tool == .pen || (mark.points.count > 1 && hypot(mark.points.last!.x-mark.points[0].x,mark.points.last!.y-mark.points[0].y) > 2) {
+        } else if mark.tool == .guide || mark.tool == .pen || (mark.points.count > 1 && hypot(mark.points.last!.x-mark.points[0].x,mark.points.last!.y-mark.points[0].y) > 2) {
             let isEmptyEllipse = mark.tool == .ellipse && (abs(mark.points.last!.x-mark.points[0].x) < 1 || abs(mark.points.last!.y-mark.points[0].y) < 1)
             if !isEmptyEllipse { document.commit(document.marks + [mark]) }
-            if mark.tool == .arrow { document.selected = mark.id }
+            if mark.tool == .arrow || mark.tool == .guide { document.selected = mark.id }
         }
         draft = nil; moving = nil; bending = nil; resizing = nil; endpointIndex = nil; dragOrigin = nil; needsDisplay = true
     }
