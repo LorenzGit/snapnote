@@ -23,6 +23,7 @@ No account, network access, uploads, or analytics. Images stay on your Mac.
 - Full-image dotted guides with optional percentage labels. Vertical guides measure left to right; horizontal guides measure top to bottom. Labels stay inside the image.
 - Shift-drag for circles and squares. Select marks to move them or change their color and size.
 - A footer note that grows from one to five lines, then scrolls. Export adds it below the original image without side padding.
+- Crop or extend with **C**. Drag edges inward to trim or outward to add black, then press Enter to apply. Repeat to trim first and add new black space afterward. Applying merges annotations into the image; Undo restores the previous editable state.
 - Undo/redo, PNG saving, and clipboard copying at the image's original resolution.
 - Hover controls for tooltips and shortcuts.
 
@@ -30,6 +31,7 @@ No account, network access, uploads, or analytics. Images stay on your Mac.
 | --- | --- |
 | ⌘⇧2 | Capture a region from any app |
 | V / A / P / R / E / T | Move / arrow / draw / box / ellipse / text |
+| C | Crop / extend the image; Enter applies, Escape cancels |
 | G | Place or drag a dotted guide |
 | Shift+G | Switch guide direction, preserving its percentage |
 | ⌘⇧P | Show/hide the selected guide percentage, or set it for new guides |
@@ -70,7 +72,7 @@ For stable local signing, configure the ignored files described in `scripts/sign
 
 - One image at a time. Opening or capturing another replaces the current edit.
 - Edits survive closing the window, but not quitting. Saved PNGs flatten annotations and the footer; there are no editable project files yet.
-- The capture shortcut is fixed. No history, crop, blur, or automatic updates.
+- The capture shortcut is fixed. No capture history, blur, or automatic updates.
 - The public build requires a Gatekeeper exception. Future notarized releases require a Developer ID certificate and Apple's notarization service.
 
 ## Contributing and license

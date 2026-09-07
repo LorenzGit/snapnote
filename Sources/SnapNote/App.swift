@@ -146,6 +146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return try Renderer.export(image: image, marks: document.marks, blurb: document.blurb, scale: document.pixelScale)
     }
 
+    func applyCrop() {
+        do { try document.applyCrop() }
+        catch { showError(error.localizedDescription) }
+    }
+
     @objc func copyImage() {
         do {
             guard let data = try output() else { return }
@@ -217,6 +222,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if flags.contains(.shift) { document.redo() } else { document.undo() }; return nil
             default: return event
             }
+        }
+        if !editing, flags.intersection([.command, .control, .option]).isEmpty {
+            if document.cropRect != nil {
+                if event.keyCode == 53 { document.cropRect = nil; return nil }
+                if event.keyCode == 36 || event.keyCode == 76 { applyCrop(); return nil }
+                return event
+            }
+            if key == "c" { finishText(); document.beginCrop(); return nil }
         }
         if !editing, flags.intersection([.command, .control, .option]).isEmpty, flags.contains(.shift), key == "g" {
             let axis = document.selectedGuide?.guideAxis ?? document.guideAxis

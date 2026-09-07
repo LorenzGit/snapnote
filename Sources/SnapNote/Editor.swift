@@ -21,7 +21,10 @@ struct Editor: View {
             toolbar
             Divider().opacity(0.35)
             if document.image != nil {
-                Canvas(document: document)
+                Group {
+                    if document.cropRect != nil { CropCanvas(document: document) }
+                    else { Canvas(document: document) }
+                }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(nsColor: NSColor(calibratedWhite: 0.09, alpha: 1)))
                     .overlay(alignment: .bottom) {
@@ -32,7 +35,11 @@ struct Editor: View {
                                 .padding(16).allowsHitTesting(false)
                         }
                     }
-                if noteExpanded { noteEditor }
+                if document.cropRect != nil {
+                    Text("Drag edges inward to crop or outward to extend in black. Applying merges annotations; Undo restores them.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center).padding(10)
+                } else if noteExpanded { noteEditor }
             } else { welcome }
         }
         .frame(minWidth: 680, minHeight: 420)
@@ -52,6 +59,15 @@ struct Editor: View {
 
     private var toolbar: some View {
         HStack(spacing: 3) {
+            if let rect = document.cropRect {
+                Image(systemName: "crop").foregroundStyle(Color.accentColor).padding(.horizontal, 5)
+                Text("\(Int((rect.width*document.pixelScale).rounded())) × \(Int((rect.height*document.pixelScale).rounded())) px")
+                    .font(.system(size: 12)).monospacedDigit()
+                Spacer()
+                Button("Reset") { document.beginCrop() }.help("Reset to the current image bounds")
+                Button("Cancel") { document.cropRect = nil }.help("Cancel crop · Escape")
+                Button("Apply") { app.applyCrop() }.buttonStyle(.borderedProminent).help("Apply crop or extension · Return")
+            } else {
             if document.image != nil {
                 ForEach(Tool.allCases) { tool in
                     iconButton(tool.rawValue, symbol: tool.symbol, hint: "\(tool.rawValue) · \(tool.key) — \(tool.hint)", selected: document.tool == tool) {
@@ -67,6 +83,9 @@ struct Editor: View {
                     if tool == .arrow && (document.tool == .arrow || document.selectedArrow != nil) {
                         arrowLabelMenu
                     }
+                }
+                iconButton("Crop / Extend", symbol: "crop", hint: "Crop or extend the image · C") {
+                    app.finishText(); noteFocused = false; document.beginCrop()
                 }
                 separator
                 Button { app.finishText(); colors.toggle() } label: {
@@ -113,6 +132,7 @@ struct Editor: View {
             }.buttonStyle(.plain).disabled(document.image == nil)
                 .accessibilityLabel("Copy image").help("Copy image and footer · ⌘⇧C")
                 .keyboardShortcut("c", modifiers: [.command, .shift]).padding(.leading, 5)
+            }
         }
         .padding(.leading, 78).padding(.trailing, 10).frame(height: 46)
     }

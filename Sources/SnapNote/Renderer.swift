@@ -114,6 +114,29 @@ enum Renderer {
         return data
     }
 
+    static func crop(image: NSImage, marks: [Mark], rect: CGRect, scale: CGFloat) throws -> NSImage {
+        let pw = ceil(rect.width*scale), ph = ceil(rect.height*scale)
+        guard rect.minX.isFinite, rect.minY.isFinite, scale.isFinite, scale >= 1,
+              pw.isFinite, ph.isFinite, pw > 0, ph > 0, pw*ph <= 120_000_000,
+              let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(pw), pixelsHigh: Int(ph), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let graphics = NSGraphicsContext(bitmapImageRep: bitmap) else { throw ExportError.tooLarge }
+        // Flatten against the current image bounds before cropping. Removed pixels
+        // and off-image marks cannot reappear in a later extension.
+        let data = try export(image: image, marks: marks, blurb: "", scale: scale)
+        guard let source = NSImage(data: data) else { throw ExportError.encoding }
+        source.size = image.size
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        let cg = graphics.cgContext
+        cg.translateBy(x: 0, y: ph); cg.scaleBy(x: scale, y: -scale)
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: cg, flipped: true)
+        NSColor.black.setFill(); CGRect(origin: .zero, size: rect.size).fill()
+        source.draw(in: CGRect(x: -rect.minX, y: -rect.minY, width: image.size.width, height: image.size.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.none])
+        let result = NSImage(size: rect.size)
+        bitmap.size = rect.size; result.addRepresentation(bitmap)
+        return result
+    }
+
     enum ExportError: LocalizedError {
         case tooLarge, encoding
         var errorDescription: String? { self == .tooLarge ? "This image is too large to export. Try a smaller capture or shorter note." : "The PNG could not be encoded." }

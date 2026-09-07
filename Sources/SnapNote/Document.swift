@@ -96,21 +96,28 @@ final class Document: ObservableObject {
     @Published var capturing = false
     @Published var canUndo = false
     @Published var canRedo = false
-    private var undoStack: [[Mark]] = []
-    private var redoStack: [[Mark]] = []
+    @Published var cropRect: CGRect?
+    private struct Snapshot {
+        let image: NSImage?
+        let marks: [Mark]
+        let scale: CGFloat
+    }
+    private var snapshot: Snapshot { Snapshot(image: image, marks: marks, scale: pixelScale) }
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
     var pixelScale: CGFloat = 1
 
     func load(_ image: NSImage) {
         self.image = image
         let pixels = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         pixelScale = CGFloat(pixels?.width ?? Int(image.size.width)) / max(1, image.size.width)
-        marks = []; blurb = ""; selected = nil; editingText = nil
+        marks = []; blurb = ""; selected = nil; editingText = nil; cropRect = nil
         undoStack = []; redoStack = []; syncHistory()
         status = "Captured · Add a little context"
     }
 
     func commit(_ updated: [Mark]) {
-        undoStack.append(marks)
+        undoStack.append(snapshot)
         if undoStack.count > 100 { undoStack.removeFirst() }
         redoStack.removeAll()
         marks = updated
@@ -119,12 +126,40 @@ final class Document: ObservableObject {
 
     func undo() {
         guard let previous = undoStack.popLast() else { return }
-        redoStack.append(marks); marks = previous; selected = nil; syncHistory()
+        redoStack.append(snapshot); restore(previous)
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(marks); marks = next; selected = nil; syncHistory()
+        undoStack.append(snapshot); restore(next)
+    }
+
+    private func restore(_ state: Snapshot) {
+        image = state.image; marks = state.marks; pixelScale = state.scale
+        selected = nil; cropRect = nil; syncHistory()
+    }
+
+    func beginCrop() {
+        guard let image else { return }
+        selected = nil
+        cropRect = CGRect(origin: .zero, size: image.size)
+    }
+
+    func applyCrop() throws {
+        guard let image, let cropRect else { return }
+        let scale = max(1, pixelScale)
+        let rect = CGRect(x: (cropRect.minX*scale).rounded()/scale,
+                          y: (cropRect.minY*scale).rounded()/scale,
+                          width: max(1, (cropRect.width*scale).rounded())/scale,
+                          height: max(1, (cropRect.height*scale).rounded())/scale)
+        if rect == CGRect(origin: .zero, size: image.size) { self.cropRect = nil; return }
+        let result = try Renderer.crop(image: image, marks: marks, rect: rect, scale: scale)
+        undoStack.append(snapshot)
+        if undoStack.count > 100 { undoStack.removeFirst() }
+        redoStack.removeAll()
+        self.image = result; marks = []; selected = nil; self.cropRect = nil
+        pixelScale = scale; tool = .select; syncHistory()
+        status = "Crop applied"
     }
 
     func deleteSelected() {
