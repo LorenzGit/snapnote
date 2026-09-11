@@ -5,6 +5,27 @@ import XCTest
 final class ArrowTests: XCTestCase {
     override class func setUp() { super.setUp(); _ = NSApplication.shared }
 
+    func testHeadGrowsWithStrokeAndEndpointLength() throws {
+        for length: CGFloat in [12, 30, 100, 400] {
+            var previous: CGFloat = 0
+            for width: CGFloat in [2, 4, 7, 11] {
+                let mark = Mark(tool: .arrow, points: [.zero, CGPoint(x: length, y: 0)], color: .red, width: width)
+                let arrow = try XCTUnwrap(ArrowGeometry(mark))
+                XCTAssertGreaterThan(arrow.head.bounds.width, previous)
+                XCTAssertLessThan(arrow.head.bounds.width, length/2)
+                previous = arrow.head.bounds.width
+            }
+        }
+        for width: CGFloat in [2, 4, 7, 11] {
+            var previous: CGFloat = 0
+            for length: CGFloat in [12, 30, 100, 400] {
+                let arrow = try XCTUnwrap(ArrowGeometry(Mark(tool: .arrow, points: [.zero, CGPoint(x: length, y: 0)], color: .red, width: width)))
+                XCTAssertGreaterThan(arrow.head.bounds.width, previous)
+                previous = arrow.head.bounds.width
+            }
+        }
+    }
+
     func testCurveGeometryMovesAndCanBeSelectedAwayFromStraightLine() throws {
         let mark = Mark(tool: .arrow, points: [CGPoint(x: 100,y: 100), CGPoint(x: 500,y: 100)], color: .red, width: 4, text: "Move", fontSize: 16, bend: 0.4)
         let arrow = try XCTUnwrap(ArrowGeometry(mark))

@@ -37,12 +37,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.setFrameAutosaveName("SnapNoteEditor")
         window.center()
         if CommandLine.arguments.contains("--sample") { document.load(Sample.image()) }
-        showEditor()
+        presentAtLaunch(event: NSAppleEventManager.shared().currentAppleEvent)
         registerHotKey()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             return self.handleKey(event)
         }
+    }
+
+    func presentAtLaunch(event: NSAppleEventDescriptor?) {
+        // Login items receive an open-application event marked by macOS.
+        // Keep the window hidden while the global capture shortcut is registered.
+        let launchReason = event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue
+        let automaticLaunch = event?.eventClass == kCoreEventClass
+            && event?.eventID == kAEOpenApplication
+            && (launchReason == keyAELaunchedAsLogInItem || launchReason == keyAELaunchedAsServiceItem)
+        if !automaticLaunch { showEditor() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showEditor(); return true }

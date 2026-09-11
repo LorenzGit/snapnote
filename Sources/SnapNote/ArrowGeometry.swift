@@ -27,7 +27,11 @@ struct ArrowGeometry {
             return CGPoint(x: u*u*start.x + 2*u*t*control.x + t*t*end.x,
                            y: u*u*start.y + 2*u*t*control.y + t*t*end.y)
         }
-        let headLength = min(max(14, mark.width*4), length*0.5)
+        // Scale with both stroke and arrow length. A soft limit keeps short
+        // arrows usable without freezing the head size at a minimum or cap.
+        let desiredHead = mark.width * 4 * sqrt(length / 100)
+        let headLimit = length * 0.5
+        let headLength = headLimit * desiredHead / (headLimit + desiredHead)
         let depth = headLength*cos(0.48)
         // Trim the curve beneath the head instead of stroking through the pointed tip.
         var low: CGFloat = 0, high: CGFloat = 1
